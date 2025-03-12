@@ -1,4 +1,5 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting, WorkspaceLeaf, TFile } from 'obsidian';
+import { CalendarView, VIEW_TYPE_CALENDAR } from './calendarView';
 
 // Remember to rename these classes and interfaces!
 
@@ -10,19 +11,26 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
 	mySetting: 'default'
 }
 
-export default class MyPlugin extends Plugin {
+export default class CalendarPlugin extends Plugin {
 	settings: MyPluginSettings;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
+		// 注册视图
+		this.registerView(
+			VIEW_TYPE_CALENDAR,
+			(leaf) => new CalendarView(leaf)
+		);
+
+		// 添加图标按钮到左侧
+		this.addRibbonIcon(
+			'calendar-with-checkmark',
+			'日历视图',
+			async () => {
+				await this.activateView();
+			}
+		);
 
 		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
 		const statusBarItemEl = this.addStatusBarItem();
@@ -78,8 +86,24 @@ export default class MyPlugin extends Plugin {
 		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
 	}
 
-	onunload() {
+	async onunload() {
+		// 清理视图
+		this.app.workspace.detachLeavesOfType(VIEW_TYPE_CALENDAR);
+	}
 
+	async activateView() {
+		// 如果视图已存在，激活它
+		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CALENDAR);
+		if (leaves.length > 0) {
+			this.app.workspace.revealLeaf(leaves[0]);
+			return;
+		}
+
+		// 创建新的视图
+		await this.app.workspace.getRightLeaf(false).setViewState({
+			type: VIEW_TYPE_CALENDAR,
+			active: true,
+		});
 	}
 
 	async loadSettings() {
@@ -108,9 +132,9 @@ class SampleModal extends Modal {
 }
 
 class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+	plugin: CalendarPlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: CalendarPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}

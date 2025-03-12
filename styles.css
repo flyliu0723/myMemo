@@ -6,3 +6,651 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+
+.calendar-container {
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.calendar {
+    width: 280px;
+    min-width: 280px;
+    height: 100%;
+    padding: 20px;
+    border-right: 1px solid var(--background-modifier-border);
+    background-color: var(--background-primary);
+    overflow-y: auto;
+    z-index: 1;
+}
+
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.calendar-header button {
+    background: transparent;
+    color: var(--text-normal);
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background-color 0.2s;
+}
+
+.calendar-header button:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.calendar-title {
+    font-weight: bold;
+    font-size: 1.1em;
+    flex: 1;
+    text-align: center;
+}
+
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    margin-bottom: 10px;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+}
+
+.calendar-day {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 32px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.9em;
+}
+
+.calendar-day:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+.calendar-day.other-month {
+    color: var(--text-muted);
+}
+
+.calendar-day.today {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    font-weight: bold;
+}
+
+.calendar-day.has-notes {
+    font-weight: normal;
+    border: none;
+    background-color: var(--calendar-heat-1);
+}
+
+.calendar-day.has-notes:hover {
+    background-color: var(--calendar-heat-2);
+}
+
+.calendar-day.selected {
+    background-color: var(--interactive-accent) !important;
+    color: var(--text-on-accent);
+    transform: scale(0.9);
+}
+
+.daily-content {
+    flex: 1;
+    height: 100%;
+    overflow-y: auto;
+    position: relative;
+    padding: 20px;
+    background-color: var(--background-primary);
+    display: flex;
+    flex-direction: column;
+}
+
+.content-card {
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    cursor: pointer;
+    transition: box-shadow 0.2s;
+}
+
+.content-card:hover {
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.content-card h3 {
+    margin: 0 0 10px 0;
+    color: var(--text-normal);
+}
+
+/* 添加响应式布局 */
+@media screen and (max-width: 800px) {
+    .calendar-container {
+        flex-direction: column;
+    }
+    
+    .calendar {
+        width: 100%;
+        border-right: none;
+        border-bottom: 1px solid var(--background-modifier-border);
+    }
+}
+
+/* 添加热力图颜色变量 */
+.theme-light {
+    --calendar-heat-1: #9be9a8;
+    --calendar-heat-2: #40c463;
+    --calendar-heat-3: #30a14e;
+    --calendar-heat-4: #216e39;
+}
+
+.theme-dark {
+    --calendar-heat-1: #2c3a41;
+    --calendar-heat-2: #1d4c39;
+    --calendar-heat-3: #216e39;
+    --calendar-heat-4: #30a14e;
+}
+
+.daily-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    /* padding-bottom: 10px; */
+    border-bottom: 2px solid var(--background-modifier-border);
+}
+
+.new-note-button {
+    background-color: var(--interactive-accent);
+    color: var(--text-on-accent);
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.new-note-button:hover {
+    background-color: var(--interactive-accent-hover);
+}
+
+.empty-state {
+    text-align: center;
+    padding: 16px;
+    color: var(--text-muted);
+    font-size: 0.9em;
+    background: var(--background-primary-alt);
+    border-radius: 4px;
+    margin: 4px 0;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.timeline-section:empty,
+.todo-section:empty,
+.memo-section:empty {
+    min-height: 100px;
+}
+
+.notes-container {
+    display: grid;
+    gap: 15px;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.card-header {
+    margin-bottom: 10px;
+}
+
+.card-preview {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    line-height: 1.5;
+}
+
+/* 添加新的样式 */
+.content-container {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 16px;
+    background-color: var(--background-secondary);
+    border-radius: 8px;
+    min-height: 200px;
+}
+
+/* 各部分通用样式 */
+.timeline-section,
+.todo-section,
+.memo-section {
+    width: 100%;
+    box-sizing: border-box;
+    background: var(--background-primary);
+    border-radius: 8px;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+}
+
+/* 标题样式 */
+.timeline-section h3,
+.todo-section h3,
+.memo-section h3 {
+    margin: 0 0 15px 0;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--background-modifier-border);
+    color: var(--text-normal);
+    font-size: 1.2em;
+}
+
+/* 任务列表样式优化 */
+.todo-section {
+    padding: 20px;
+}
+
+.todo-section ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.todo-section .task-list-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--background-modifier-border);
+    margin: 2px 0;
+}
+
+.todo-section .task-list-item:last-child {
+    border-bottom: none;
+}
+
+.todo-section .task-list-item-checkbox {
+    margin: 0 8px 0 0;
+}
+
+/* 标签样式 */
+.todo-section .tag {
+    background: var(--background-modifier-border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    margin: 0 8px;
+}
+
+/* 优先级图标样式 */
+.todo-section .task-list-item .priority-icon {
+    margin-left: auto;
+    opacity: 0.8;
+}
+
+/* 完成的任务样式 */
+.todo-section .task-list-item.is-checked {
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+/* Memo 样式 */
+.memo-section ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.memo-section li {
+    margin-bottom: 8px;
+    padding: 8px;
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 6px;
+}
+
+/* 时间轨迹图表样式 */
+.timeline-section {
+    overflow: visible;
+    padding: 0 !important;
+}
+
+.timeline-section .mermaid {
+    width: 100%;
+    margin: 0;
+    /* padding: 12px; */
+    transform: scale(0.9);
+    transform-origin: top center;
+}
+
+.timeline-section .mermaid svg {
+    width: 100% !important;
+    height: auto !important;
+    min-height: 100px;
+}
+
+/* 调整时间轨迹内容区域 */
+.timeline-section > div {
+    /* padding: 12px; */
+    background: var(--background-primary);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* 确保 Mermaid 图表容器不受限制 */
+.timeline-section .mermaid-view-container {
+    width: 100% !important;
+    max-width: none !important;
+    overflow: visible;
+}
+
+/* 移除时间轨迹部分的重复标题 */
+.timeline-section h3:not(:first-child),
+.todo-section h3:not(:first-child),
+.memo-section h3:not(:first-child) {
+    display: none;
+}
+
+/* 标签样式 */
+.memo-section .tag {
+    background: var(--background-modifier-border);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.9em;
+    color: var(--text-muted);
+    margin-right: 4px;
+}
+
+/* 错误状态样式 */
+.error-state {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-error);
+    background: var(--background-modifier-error);
+    border-radius: 4px;
+    margin: 20px;
+}
+
+/* 任务列表交互样式 */
+.task-list-item-checkbox {
+    cursor: pointer !important;
+}
+
+.task-list-item {
+    transition: opacity 0.2s;
+}
+.task-list-item p{
+    margin: 5px 0;
+}
+
+.task-list-item.is-checked {
+    opacity: 0.7;
+}
+
+/* 确保选中状态的视觉反馈 */
+.task-list-item-checkbox:checked {
+    background-color: var(--interactive-accent) !important;
+    border-color: var(--interactive-accent) !important;
+}
+
+/* 标签云样式 */
+.tag-cloud {
+    margin-top: auto;
+    padding: 15px;
+    border-top: 1px solid var(--background-modifier-border);
+    background-color: var(--background-primary);
+}
+
+.tag-cloud h3 {
+    margin: 0 0 12px 0;
+    font-size: 1.1em;
+    color: var(--text-normal);
+    font-weight: 600;
+    display: none; /* 隐藏标题 */
+}
+
+.tag-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 500px;
+    overflow-y: auto;
+    padding: 0;
+}
+
+/* 标签项样式 */
+.tag-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+    font-size: 16px;
+    color: var(--text-normal);
+    gap: 8px;
+}
+
+.tag-item:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+/* 修改展开/折叠图标 */
+.tag-toggle {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 28px;
+    opacity: 0.6;
+    margin-top: -8px;
+}
+
+.tag-toggle::before {
+    content: "›"; /* 折叠状态 */
+    transform: rotate(0deg);
+    transition: transform 0.2s;
+}
+
+.tag-item:has(+ .tag-children:not(.hidden)) .tag-toggle::before {
+    transform: rotate(90deg); /* 展开状态 */
+}
+
+.tag-label {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tag-label::before {
+    content: "#";
+    color: var(--text-muted);
+    opacity: 0.6;
+}
+
+.tag-count {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    opacity: 0.8;
+}
+
+/* 修改标签层级样式 */
+.tag-children {
+    margin-left: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.tag-children.hidden {
+    display: none;
+}
+
+/* 调整层级缩进 */
+.level-1 { margin-left: 0; }
+.level-2 { margin-left: 20px; }
+.level-3 { margin-left: 40px; }
+.level-4 { margin-left: 60px; }
+
+/* 滚动条样式 */
+.tag-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.tag-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.tag-container::-webkit-scrollbar-thumb {
+    background-color: var(--background-modifier-border);
+    border-radius: 3px;
+}
+
+/* 选中状态 */
+.tag-item.selected {
+    background-color: var(--background-modifier-hover);
+}
+
+/* 标签大小根据使用频率变化 */
+.tag-size-1 { font-size: 0.9em; }
+.tag-size-2 { font-size: 1em; }
+.tag-size-3 { font-size: 1.1em; }
+.tag-size-4 { font-size: 1.2em; }
+.tag-size-5 { font-size: 1.3em; }
+
+/* 标签文件弹窗样式 */
+.tagged-files-modal {
+    width: 100%;
+    max-width: 800px;
+    max-height: 80vh;
+}
+
+.tagged-files-modal-container {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.tagged-files-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.tagged-files-header {
+    margin: 0;
+    font-size: 1.5em;
+    color: var(--text-normal);
+}
+
+.modal-close-button {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+    width: 28px;
+    height: 28px;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.modal-close-button:hover {
+    background-color: var(--background-modifier-hover);
+    /* color: var(--text-normal); */
+}
+
+.tagged-files-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.note-card {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.note-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.note-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.note-card-title {
+    font-weight: 600;
+    color: var(--text-normal);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.note-card-date {
+    font-size: 0.9em;
+    color: var(--text-muted);
+    font-weight: normal;
+}
+
+.note-card-content {
+    color: var(--text-muted);
+    font-size: 0.9em;
+    line-height: 1.5;
+    max-height: 200px;
+    overflow: hidden;
+}
+
+.loading-indicator {
+    text-align: center;
+    padding: 16px;
+    color: var(--text-muted);
+    margin-top: auto;
+}
+
+.loading-indicator.hidden {
+    display: none;
+}
+
+.observer-target {
+    height: 20px;
+    margin-top: 16px;
+    visibility: hidden;
+}
