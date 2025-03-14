@@ -100,7 +100,7 @@ export default class CalendarPlugin extends Plugin {
 		}
 
 		// 创建新的视图
-		await this.app.workspace.getRightLeaf(false).setViewState({
+		await this.app.workspace.getLeaf(false).setViewState({
 			type: VIEW_TYPE_CALENDAR,
 			active: true,
 		});

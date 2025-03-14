@@ -1,4 +1,5 @@
 import { ItemView, WorkspaceLeaf, MarkdownRenderer, Modal, Notice, TFile, App, MarkdownView, Editor } from 'obsidian';
+import * as path from 'path'; // 必须显式导入
 
 interface TodoItem {
     content: string;
@@ -26,8 +27,10 @@ interface TagNode {
     files: Set<string>;
     children: Map<string, TagNode>;
 }
-
+const IMAGE_REGEX = /!\[\[([^\]]+?\.(?:png|jpg|jpeg|gif|webp|bmp))(\\?[|\]]?.*?)\]\]/g;
 export const VIEW_TYPE_CALENDAR = 'calendar-view';
+
+const IMAGE_BASE_URL = '01Inbox/static/'
 
 export class CalendarView extends ItemView {
     calendar: HTMLElement;
@@ -303,7 +306,6 @@ export class CalendarView extends ItemView {
                         const contentWithoutTitle = sectionContent
                             .replace(/^[⏳🎯📝].*?\n/, '') // 移除emoji开头的标题行
                             .trim();
-
                         if (sectionContent.startsWith('⏳ 时间轨迹')) {
                             await MarkdownRenderer.renderMarkdown(
                                 contentWithoutTitle,
@@ -312,7 +314,7 @@ export class CalendarView extends ItemView {
                                 this
                             );
                         }
-                        else if (sectionContent.startsWith('🎯 每日任务')) {
+                        else if (sectionContent.startsWith('🎯 每日任务') || sectionContent.startsWith('Day Planners')) {
                             // 移除优先级标题，只保留任务列表
                             const contentWithoutPriorityHeaders = contentWithoutTitle
                                 .replace(/###\s*[🔴🟡🟢].*?\n/g, '')  // 移除优先级标题
@@ -347,7 +349,12 @@ export class CalendarView extends ItemView {
                             // 使用新的任务点击处理器
                             this.setupTaskClickHandler(todoContainer, file);
                         }
-                        else if (sectionContent.startsWith('📝 memo')) {
+                        else if (sectionContent.startsWith('memo') || sectionContent.startsWith('📝 memo')) {
+                            console.log(contentWithoutTitle, 444555666)
+                            // .replace(
+                            //     /!\[\[([^\]]+\.(?:png|jpg|jpeg|gif|svg|webp))\]\]/g,
+                            //     (match, path) => `![[${IMAGE_BASE_URL}${encodeURIComponent(path)}]]`
+                            // )
                             await MarkdownRenderer.renderMarkdown(
                                 contentWithoutTitle,
                                 memoSection.createDiv(),
@@ -370,7 +377,76 @@ export class CalendarView extends ItemView {
             });
         }
     }
-
+    // 完整功能函数（支持Obsidian插件开发环境）
+    async processLocalImages(
+        content: string,
+        vault: Vault,
+        currentFile: TFile
+    ): Promise<string> {
+        // 匹配Obsidian图片语法（包含参数和特殊字符）
+        const IMAGE_REGEX = /!\[\[([^\]]+?\.(?:png|jpg|jpeg|gif|webp|bmp))(\\?[|\]]?.*?)\]\]/g;
+    
+        // 获取用户配置的附件目录（默认_Attachment）
+        const attachmentFolder = vault.config.attachmentFolderPath || '_Attachment';
+    
+        // 创建路径缓存（提升重复路径处理性能）
+        const pathCache = new Map<string, string>();
+    
+        // 替换处理逻辑
+        const processedContent = content.replace(IMAGE_REGEX, async (match, pathPart, params) => {
+        try {
+            // 标准化路径（处理Windows反斜杠和URI编码）
+            const normalizedPath = pathPart
+            .replace(/\\/g, '/')
+            .replace(/#.*$/, '') // 移除锚点（[[5]](#__5)）
+            .trim();
+    
+            // 检查缓存
+            if (pathCache.has(normalizedPath)) {
+            return `![[${pathCache.get(normalizedPath)}${params}]]`;
+            }
+    
+            // 动态构建完整路径（适配用户配置）
+            let fullPath: string;
+            if (normalizedPath.startsWith('/')) {
+            // 绝对路径处理（[[4]](#__4)）
+            fullPath = normalizedPath.slice(1);
+            } else {
+            // 相对路径处理（[[7]](#__7)）
+            const currentDir = path.dirname(currentFile.path);
+            fullPath = path.join(currentDir, normalizedPath);
+            }
+    
+            // 验证文件存在性（[[2]](#__2)）
+            const targetFile = vault.getAbstractFileByPath(fullPath);
+            if (!(targetFile instanceof TFile)) {
+            console.warn(`图片不存在: ${fullPath}`);
+            return match; // 保留原始格式
+            }
+    
+            // 创建附件目录结构（[[4]](#__4)）
+            const destFolder = path.join(attachmentFolder, path.dirname(normalizedPath));
+            await vault.createFolder(destFolder).catch(() => {}); // 忽略已存在错误
+    
+            // 构建最终路径（带URI编码）
+            const encodedPath = encodeURI(path.join(attachmentFolder, normalizedPath))
+            .replace(/'/g, '%27')
+            .replace(/\(/g, '%28')
+            .replace(/\)/g, '%29');
+    
+            // 更新缓存
+            pathCache.set(normalizedPath, encodedPath);
+    
+            return `![[${encodedPath}${params}]]`;
+        } catch (error) {
+            console.error(`图片处理失败: ${error}`);
+            return match; // 失败时保留原始内容
+        }
+        });
+    
+        return processedContent;
+    }
+  
     private parseContent(content: string): {
         timeline: string | null;
         todos: TodoItem[];
@@ -759,7 +835,7 @@ export class CalendarView extends ItemView {
         let leaf = workspace.getLeavesOfType(VIEW_TYPE_CALENDAR)[0];
         
         if (!leaf) {
-            leaf = workspace.getRightLeaf(false);
+            leaf = workspace.getLeaf(false);
             await leaf.setViewState({
                 type: VIEW_TYPE_CALENDAR,
                 active: true,
@@ -879,39 +955,117 @@ class TaggedFilesModal extends Modal {
     }
 
     private createNoteCard(file: TFile, content: string): HTMLElement {
-        const card = createEl('div', { cls: 'note-card' });
+        const card = createEl('div', { cls: 'note-card enhanced-card' });
 
-        // 创建卡片头部
+        // 卡片头部（保持原样）
         const header = card.createDiv({ cls: 'note-card-header' });
-        
-        // 文件名和日期
-        const titleEl = header.createDiv({ cls: 'note-card-title' });
-        titleEl.createSpan({ text: file.basename });
-        // titleEl.createSpan({ 
-        //     text: file.stat.mtime ? new Date(file.stat.mtime).toLocaleDateString('zh-CN') : '',
-        //     cls: 'note-card-date' 
-        // });
+        header.createDiv({ 
+            cls: 'note-card-title',
+            text: file.basename 
+        });
 
-        // 创建卡片内容
-        const contentEl = card.createDiv({ cls: 'note-card-content' });
-        
-        // 使用 Obsidian 的 Markdown 渲染
-        MarkdownRenderer.renderMarkdown(
-            this.getPreviewContent(content),
-            contentEl,
-            file.path,
-            this
-        );
+        // 新增标签内容容器
+        const tagContentContainer = card.createDiv({ cls: 'tag-content-container' });
 
-        // 添加点击事件
-        card.addEventListener('click', async () => {
-            await this.app.workspace.getLeaf(false).openFile(file);
-            this.close();
+        // 解析并渲染标签相关内容
+        this.renderTagSpecificContent(content, tagContentContainer, file);
+
+        // 点击事件保持原样
+        card.addEventListener('click', async (e) => {
+            if (!(e.target as HTMLElement).closest('.tag-content-block')) {
+                await this.app.workspace.getLeaf(false).openFile(file);
+                this.close();
+            }
         });
 
         return card;
     }
+    // 匹配形如 "- 08:47" 的时间行
+    private splitByTimeBlock(mdContent) {
+        const timeBlockRegex = /^- \d{2}:\d{2}/gm;
+        return mdContent.split(timeBlockRegex)
+        .slice(1) // 去除第一个空元素
+        .map((block, index) => {
+            return block
+            // const timeMatch = mdContent.match(timeBlockRegex)[index];
+            // return {
+            //     time: timeMatch.trim().replace(/^- /, ''),
+            //     content: block.trim()
+            // };
+        });
+    }
+    async private renderTagSpecificContent(content: string, container: HTMLElement, file: TFile) {
+    
+        const MERMAIRD_REGEX = /```mermaid([\s\S]*?)```/g;
+        const LOCAL_IMAGE_REGEX = /!\[\[([^\]]+\.(?:png|jpg|gif|webp))(?:\\?\||\])/g;
 
+        const blockEl = container.createDiv({ cls: 'tag-content-block' });
+        blockEl.createEl('div', {});
+
+        const lines = content.split(/^## /m)
+        for (const section of lines) {
+            const sectionContent = section.trim();
+            // 移除原始标题，只保留内容
+            const contentWithoutTitle = sectionContent
+                .replace(/^[⏳🎯📝].*?\n/, '') // 移除emoji开头的标题行
+                .trim();
+            if(sectionContent.startsWith('memo') || sectionContent.startsWith('📝 memo')) {
+                let block = this.splitByTimeBlock(sectionContent)
+                let renderBlock = block.filter(item => item.includes(this.tagInfo.tag))
+                // console.log(renderBlock, 66669999)
+
+                renderBlock.forEach(async content => {
+                    console.log(666666, content.replace(/(\n *)(```)/g, '$2').trim())
+                    // 替换为临时占位符
+                    // content = content.replace(MERMAIRD_REGEX, (match) => `<!--MERMAIRD_BLOCK-->${match}<!--/MERMAIRD_BLOCK-->`);
+                    await MarkdownRenderer.renderMarkdown(
+                        content.replace(/(\n *)(```)/g, '$2').replace(/(\t *)(```)/g, '$2').replace(/(\n\t *)(```)/g, '$2').trim(),
+                        blockEl.createEl(),
+                        file.path,
+                        this
+                    );
+                })
+                
+            }
+        }
+    }
+
+    // 增强的上下文操作
+    private addContextActions(blockEl: HTMLElement, file: TFile, content: string) {
+        const actionBar = blockEl.createDiv({ cls: 'tag-content-actions' });
+        
+        // 复制完整块
+        actionBar.createEl('button', {
+            text: '📋 复制块',
+            onclick: (e) => {
+                e.stopPropagation();
+                navigator.clipboard.writeText(content);
+                new Notice('内容块已复制');
+            }
+        });
+
+        // 在编辑器中定位
+        actionBar.createEl('button', {
+            text: '🔍 定位',
+            onclick: async (e) => {
+                e.stopPropagation();
+                const contentStart = content.indexOf('#seen') + 5;
+                await this.revealInEditor(file, contentStart);
+            }
+        });
+    }
+
+    private async revealInEditor(file: TFile, position: number) {
+        const leaf = this.app.workspace.getLeaf(false);
+        await leaf.openFile(file);
+        
+        if (leaf.view instanceof MarkdownView) {
+            const editor = leaf.view.editor;
+            editor.setCursor(editor.offsetToPos(position));
+            editor.scrollIntoView({ from: editor.offsetToPos(position), to: editor.offsetToPos(position + 10) });
+        }
+        this.close();
+    }
     private getPreviewContent(content: string): string {
         // 提取前 200 个字符作为预览，确保不会截断 Markdown 语法
         const previewLength = 200;
