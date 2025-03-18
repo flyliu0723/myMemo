@@ -1,6 +1,5 @@
-import { ItemView, WorkspaceLeaf, MarkdownRenderer, Modal, Notice, TFile, App, MarkdownView, Editor } from 'obsidian';
+import { ItemView, WorkspaceLeaf, MarkdownRenderer, Modal, Notice, TFile, App, MarkdownView, Editor, Plugin, PluginSettingTab, Setting, moment } from 'obsidian';
 import * as path from 'path'; // 必须显式导入
-
 interface TodoItem {
     content: string;
     priority: string;
@@ -229,9 +228,59 @@ export class CalendarView extends ItemView {
         try {
             // 清空内容
             contentEl.empty();
+
+// 添加输入组件
+const inputContainer = contentEl.createDiv({ cls: 'daily-input-container' });
+const textarea = inputContainer.createEl('textarea', {
+  attr: { placeholder: '快速记录...' },
+  cls: 'daily-input'
+});
+textarea.style.cssText = `
+  width: 100%;
+  height: 80px;
+  margin-bottom: 8px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+`;
+
+const submitBtn = inputContainer.createEl('button', {
+  text: '添加记录',
+  cls: 'daily-submit'
+});
+submitBtn.style.cssText = `
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+`;
+
+// 添加提交事件
+submitBtn.onclick = async () => {
+  const timestamp = moment().format('HH:mm');
+  const processedContent = textarea.value.split('\n').map(line => `\t${line}`).join('\n');
+const entryContent = `- ${timestamp}\n${processedContent}`;
+  
+  const dailyNotePath = `${this.DAILY_PATH}/${moment(date).format('YYYY')}/${moment(date).format('MM')}/${moment(date).format('YYYY-MM-DD')}.md`;
+  
+  let file = this.app.vault.getAbstractFileByPath(dailyNotePath);
+  if (!file) {
+    file = await this.app.vault.create(dailyNotePath, '### 每日记录\n');
+  }
+
+  if (file instanceof TFile) {
+    const currentContent = await this.app.vault.read(file);
+    await this.app.vault.modify(file, currentContent + '\n' + entryContent);
+    textarea.value = '';
+    new Notice('记录添加成功');
+  }
+};
             
             // 添加日期标题和新建按钮
-            const headerEl = contentEl.createDiv({ cls: 'daily-header' });
+            // 添加原有头部内容
+const headerEl = contentEl.createDiv({ cls: 'daily-header' });
             headerEl.createEl('h2', {
                 text: date.toLocaleDateString('zh-CN', {
                     year: 'numeric',
@@ -307,6 +356,7 @@ export class CalendarView extends ItemView {
                             .replace(/^[⏳🎯📝].*?\n/, '') // 移除emoji开头的标题行
                             .trim();
                         if (sectionContent.startsWith('⏳ 时间轨迹')) {
+                            
                             await MarkdownRenderer.renderMarkdown(
                                 contentWithoutTitle,
                                 timelineSection.createDiv(),
@@ -350,13 +400,14 @@ export class CalendarView extends ItemView {
                             this.setupTaskClickHandler(todoContainer, file);
                         }
                         else if (sectionContent.startsWith('memo') || sectionContent.startsWith('📝 memo')) {
-                            console.log(contentWithoutTitle, 444555666)
+                            // 处理图片路径
+                            const processedContent = await this.processImagePaths(contentWithoutTitle, file);
                             // .replace(
                             //     /!\[\[([^\]]+\.(?:png|jpg|jpeg|gif|svg|webp))\]\]/g,
                             //     (match, path) => `![[${IMAGE_BASE_URL}${encodeURIComponent(path)}]]`
                             // )
                             await MarkdownRenderer.renderMarkdown(
-                                contentWithoutTitle,
+                                processedContent,
                                 memoSection.createDiv(),
                                 file.path,
                                 this
@@ -371,12 +422,91 @@ export class CalendarView extends ItemView {
             console.error('更新日期内容时出错:', error);
             // 确保即使出错也能显示基本结构
             contentEl.empty();
+
+// 添加输入组件
+const inputContainer = contentEl.createDiv({ cls: 'daily-input-container' });
+const textarea = inputContainer.createEl('textarea', {
+  attr: { placeholder: '快速记录...' },
+  cls: 'daily-input'
+});
+textarea.style.cssText = `
+  width: 100%;
+  height: 80px;
+  margin-bottom: 8px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+`;
+
+const submitBtn = inputContainer.createEl('button', {
+  text: '添加记录',
+  cls: 'daily-submit'
+});
+submitBtn.style.cssText = `
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+`;
+
+// 添加提交事件
+submitBtn.onclick = async () => {
+  const timestamp = moment().format('HH:mm');
+  const processedContent = textarea.value.split('\n').map(line => `\t${line}`).join('\n');
+const entryContent = `- ${timestamp}\n${processedContent}`;
+  
+  const dailyNotePath = `${this.DAILY_PATH}/${moment(date).format('YYYY')}/${moment(date).format('MM')}/${moment(date).format('YYYY-MM-DD')}.md`;
+  
+  let file = this.app.vault.getAbstractFileByPath(dailyNotePath);
+  if (!file) {
+    file = await this.app.vault.create(dailyNotePath, '### 每日记录\n');
+  }
+
+  if (file instanceof TFile) {
+    const currentContent = await this.app.vault.read(file);
+    await this.app.vault.modify(file, currentContent + '\n' + entryContent);
+    textarea.value = '';
+    new Notice('记录添加成功');
+  }
+};
             contentEl.createEl('div', {
                 cls: 'error-state',
                 text: '加载内容时出错，请重试'
             });
         }
     }
+
+    // 添加处理图片路径的方法
+    private async processImagePaths(content: string, file: TFile): Promise<string> {
+        const imageRegex = /!\[\[([^\]]+?\.(?:png|jpg|jpeg|gif|webp|bmp))(\\?[|\]]?.*?)\]\]/g;
+        
+        return content.replace(imageRegex, (match, imagePath) => {
+            try {
+                // 1. 获取图片文件
+                const imageFile = this.app.metadataCache.getFirstLinkpathDest(
+                    decodeURIComponent(imagePath.split('|')[0]), // 处理可能的图片参数
+                    file.path
+                );
+
+                if (imageFile instanceof TFile) {
+                    // 2. 获取图片的资源路径
+                    const resourcePath = this.app.vault.getResourcePath(imageFile);
+                    
+                    // 3. 返回标准的 Markdown 图片语法
+                    return `![${imagePath}](${resourcePath})`;
+                }
+                
+                // 如果找不到图片，保持原样
+                return match;
+            } catch (error) {
+                console.error('处理图片路径时出错:', error, {imagePath, file});
+                return match;
+            }
+        });
+    }
+
     // 完整功能函数（支持Obsidian插件开发环境）
     async processLocalImages(
         content: string,
@@ -863,6 +993,55 @@ class TaggedFilesModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
 
+// 添加输入组件
+const inputContainer = contentEl.createDiv({ cls: 'daily-input-container' });
+const textarea = inputContainer.createEl('textarea', {
+  attr: { placeholder: '快速记录...' },
+  cls: 'daily-input'
+});
+textarea.style.cssText = `
+  width: 100%;
+  height: 80px;
+  margin-bottom: 8px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+`;
+
+const submitBtn = inputContainer.createEl('button', {
+  text: '添加记录',
+  cls: 'daily-submit'
+});
+submitBtn.style.cssText = `
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+`;
+
+// 添加提交事件
+submitBtn.onclick = async () => {
+  const timestamp = moment().format('HH:mm');
+  const processedContent = textarea.value.split('\n').map(line => `\t${line}`).join('\n');
+const entryContent = `- ${timestamp}\n${processedContent}`;
+  
+  const dailyNotePath = `${this.DAILY_PATH}/${moment(date).format('YYYY')}/${moment(date).format('MM')}/${moment(date).format('YYYY-MM-DD')}.md`;
+  
+  let file = this.app.vault.getAbstractFileByPath(dailyNotePath);
+  if (!file) {
+    file = await this.app.vault.create(dailyNotePath, '### 每日记录\n');
+  }
+
+  if (file instanceof TFile) {
+    const currentContent = await this.app.vault.read(file);
+    await this.app.vault.modify(file, currentContent + '\n' + entryContent);
+    textarea.value = '';
+    new Notice('记录添加成功');
+  }
+};
+
         // 创建标题栏
         const headerEl = contentEl.createDiv({ cls: 'tagged-files-modal-header' });
         
@@ -1018,8 +1197,10 @@ class TaggedFilesModal extends Modal {
                     console.log(666666, content.replace(/(\n *)(```)/g, '$2').trim())
                     // 替换为临时占位符
                     // content = content.replace(MERMAIRD_REGEX, (match) => `<!--MERMAIRD_BLOCK-->${match}<!--/MERMAIRD_BLOCK-->`);
+                            // 处理图片路径
+                    const processedContent = await this.processImagePaths(content.replace(/(\n *)(```)/g, '$2').replace(/(\t *)(```)/g, '$2').replace(/(\n\t *)(```)/g, '$2').trim(), file);
                     await MarkdownRenderer.renderMarkdown(
-                        content.replace(/(\n *)(```)/g, '$2').replace(/(\t *)(```)/g, '$2').replace(/(\n\t *)(```)/g, '$2').trim(),
+                        processedContent,
                         blockEl.createEl(),
                         file.path,
                         this
@@ -1030,6 +1211,34 @@ class TaggedFilesModal extends Modal {
         }
     }
 
+    // 添加处理图片路径的方法
+    private async processImagePaths(content: string, file: TFile): Promise<string> {
+        const imageRegex = /!\[\[([^\]]+?\.(?:png|jpg|jpeg|gif|webp|bmp))(\\?[|\]]?.*?)\]\]/g;
+        
+        return content.replace(imageRegex, (match, imagePath) => {
+            try {
+                // 1. 获取图片文件
+                const imageFile = this.app.metadataCache.getFirstLinkpathDest(
+                    decodeURIComponent(imagePath.split('|')[0]), // 处理可能的图片参数
+                    file.path
+                );
+
+                if (imageFile instanceof TFile) {
+                    // 2. 获取图片的资源路径
+                    const resourcePath = this.app.vault.getResourcePath(imageFile);
+                    
+                    // 3. 返回标准的 Markdown 图片语法
+                    return `![${imagePath}](${resourcePath})`;
+                }
+                
+                // 如果找不到图片，保持原样
+                return match;
+            } catch (error) {
+                console.error('处理图片路径时出错:', error, {imagePath, file});
+                return match;
+            }
+        });
+    }
     // 增强的上下文操作
     private addContextActions(blockEl: HTMLElement, file: TFile, content: string) {
         const actionBar = blockEl.createDiv({ cls: 'tag-content-actions' });
@@ -1083,5 +1292,126 @@ class TaggedFilesModal extends Modal {
         this.observer.disconnect();
         const { contentEl } = this;
         contentEl.empty();
+
+// 添加输入组件
+const inputContainer = contentEl.createDiv({ cls: 'daily-input-container' });
+const textarea = inputContainer.createEl('textarea', {
+  attr: { placeholder: '快速记录...' },
+  cls: 'daily-input'
+});
+textarea.style.cssText = `
+  width: 100%;
+  height: 80px;
+  margin-bottom: 8px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+`;
+
+const submitBtn = inputContainer.createEl('button', {
+  text: '添加记录',
+  cls: 'daily-submit'
+});
+submitBtn.style.cssText = `
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+`;
+
+// 添加提交事件
+submitBtn.onclick = async () => {
+  const timestamp = moment().format('HH:mm');
+  const processedContent = textarea.value.split('\n').map(line => `\t${line}`).join('\n');
+const entryContent = `- ${timestamp}\n${processedContent}`;
+  
+  const dailyNotePath = `${this.DAILY_PATH}/${moment(date).format('YYYY')}/${moment(date).format('MM')}/${moment(date).format('YYYY-MM-DD')}.md`;
+  
+  let file = this.app.vault.getAbstractFileByPath(dailyNotePath);
+  if (!file) {
+    file = await this.app.vault.create(dailyNotePath, '### 每日记录\n');
+  }
+
+  if (file instanceof TFile) {
+    const currentContent = await this.app.vault.read(file);
+    await this.app.vault.modify(file, currentContent + '\n' + entryContent);
+    textarea.value = '';
+    new Notice('记录添加成功');
+  }
+};
     }
 } 
+
+
+
+export default class DailyInputPlugin extends Plugin {
+    async onload() {
+      // 创建悬浮窗容器
+      const container = this.addRibbonIcon('pencil', '快速输入', () => {});
+      const modal = document.createElement('div');
+      modal.style.cssText = `
+        position: fixed;
+        bottom: 60px;
+        right: 20px;
+        width: 300px;
+        background: var(--background-primary);
+        border: 2px solid var(--background-modifier-border);
+        border-radius: 8px;
+        padding: 12px;
+        z-index: 9999;
+      `;
+  
+      // 创建输入框
+      const textarea = document.createElement('textarea');
+      textarea.placeholder = '输入Markdown内容...';
+      textarea.style.cssText = `
+        width: 100%;
+        height: 120px;
+        margin-bottom: 8px;
+        resize: vertical;
+        background: var(--background-secondary);
+        color: var(--text-normal);
+      `;
+  
+      // 创建操作按钮
+      const btn = document.createElement('button');
+      btn.textContent = '追加到今日笔记';
+      btn.style.cssText = `
+        background: var(--interactive-accent);
+        color: var(--text-on-accent);
+        border: none;
+        padding: 6px 12px;
+        border-radius: 4px;
+        cursor: pointer;
+      `;
+  
+      // 事件绑定
+      btn.onclick = async () => {
+        const timestamp = moment().format('- mm:ss');
+        const content = `${timestamp}\n${textarea.value}`;
+        
+        // 获取当天文件路径
+        const dailyNotePath = `01Inbox/daily/${moment().format('YYYY')}/${moment().format('MM')}/${moment().format('YYYY-MM-DD')}.md`;
+        
+        // 文件存在性检查
+        let file = this.app.vault.getAbstractFileByPath(dailyNotePath);
+        if (!file) {
+        //   file = await this.app.vault.create(dailyNotePath, '### 每日记录\n');
+        }
+  
+        // 追加内容
+        if (file instanceof TFile) {
+          const currentContent = await this.app.vault.read(file);
+          await this.app.vault.modify(file, currentContent + '\n' + content);
+          textarea.value = '';
+        }
+      };
+  
+      // 组件装配
+      modal.appendChild(textarea);
+      modal.appendChild(btn);
+      document.body.appendChild(modal);
+    }
+  }
