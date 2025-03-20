@@ -1,5 +1,6 @@
-import { ItemView, WorkspaceLeaf, MarkdownRenderer, Modal, Notice, TFile, App, MarkdownView, Editor, Plugin, PluginSettingTab, Setting, moment } from 'obsidian';
+import { ItemView, WorkspaceLeaf, MarkdownRenderer, Modal, Notice, TFile, App, MarkdownView, Editor, TextAreaComponent } from 'obsidian';
 import * as path from 'path'; // 必须显式导入
+
 interface TodoItem {
     content: string;
     priority: string;
@@ -29,6 +30,9 @@ interface TagNode {
 const IMAGE_REGEX = /!\[\[([^\]]+?\.(?:png|jpg|jpeg|gif|webp|bmp))(\\?[|\]]?.*?)\]\]/g;
 export const VIEW_TYPE_CALENDAR = 'calendar-view';
 
+const IMAGE_BASE_URL = '01Inbox/static/'
+const IMAGE_BASE_URL_DAILY = '01Inbox/daily/'
+
 export class CalendarView extends ItemView {
     calendar: HTMLElement;
     currentDate: Date;
@@ -44,7 +48,7 @@ export class CalendarView extends ItemView {
         this.filesCache = new Map();
         this.tagCache = new Map();
         this.lastCacheUpdate = 0;
-
+        
         // 启动标签缓存更新定时器
         this.startTagCacheUpdateInterval();
     }
@@ -64,10 +68,10 @@ export class CalendarView extends ItemView {
 
         // 缓存所有日期的文件信息
         await this.cacheFileDates();
-
+        
         // 渲染日历
         this.renderCalendar();
-
+        
         // 显示今天的内容
         this.updateDailyContent(this.currentDate);
         await this.updateTagCache();
@@ -76,7 +80,7 @@ export class CalendarView extends ItemView {
     async cacheFileDates() {
         const files = this.getDailyFiles();
         this.filesCache.clear();
-
+        
         files.forEach(file => {
             const datePatterns = [
                 /(\d{4}-\d{2}-\d{2})/, // YYYY-MM-DD
@@ -103,10 +107,10 @@ export class CalendarView extends ItemView {
 
     async renderCalendar() {
         this.calendar.empty();
-
+        
         // 日历头部
         const header = this.calendar.createDiv({ cls: 'calendar-header' });
-
+        
         // 上个月按钮
         const prevBtn = header.createEl('button', { text: '←' });
         prevBtn.onclick = () => {
@@ -116,13 +120,13 @@ export class CalendarView extends ItemView {
             this.renderCalendar();
             this.updateDailyContent(this.currentDate);
         };
-
+        
         // 显示年月
-        const titleEl = header.createEl('span', {
+        const titleEl = header.createEl('span', { 
             cls: 'calendar-title',
             text: this.currentDate.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long' })
         });
-
+        
         // 下个月按钮
         const nextBtn = header.createEl('button', { text: '→' });
         nextBtn.onclick = () => {
@@ -144,16 +148,16 @@ export class CalendarView extends ItemView {
         const grid = this.calendar.createDiv({ cls: 'calendar-grid' });
         const year = this.currentDate.getFullYear();
         const month = this.currentDate.getMonth();
-
+        
         // 获取当月第一天
         const firstDay = new Date(year, month, 1);
         // 获取当月最后一天
         const lastDay = new Date(year, month + 1, 0);
-
+        
         // 计算需要显示的上个月的天数
         let firstDayWeekday = firstDay.getDay() || 7; // 将周日的0转换为7
         firstDayWeekday--; // 调整为从周一开始
-
+        
         // 添加上个月的日期
         const prevMonthLastDay = new Date(year, month, 0).getDate();
         for (let i = firstDayWeekday - 1; i >= 0; i--) {
@@ -167,34 +171,34 @@ export class CalendarView extends ItemView {
             // 使用 UTC 时间来避免时区问题
             const currentDate = new Date(Date.UTC(this.currentDate.getFullYear(), this.currentDate.getMonth(), date));
             const dateStr = currentDate.toISOString().split('T')[0];
-
+            
             // 检查是否有日记
             if (this.filesCache.has(dateStr)) {
                 dayEl.classList.add('has-notes');
             }
-
+            
             // 检查是否是今天
             if (this.isToday(this.currentDate.getFullYear(), this.currentDate.getMonth(), date)) {
                 dayEl.classList.add('today');
             }
-
+            
             // 检查是否是选中的日期
             if (this.currentDate.getDate() === date) {
                 dayEl.classList.add('selected');
             }
-
+            
             // 添加点击事件
             dayEl.onclick = () => {
                 // 使用 UTC 时间来避免时区问题
                 const selectedDate = new Date(Date.UTC(this.currentDate.getFullYear(), this.currentDate.getMonth(), date));
                 this.currentDate = selectedDate;
                 this.updateDailyContent(selectedDate);
-
+                
                 // 移除其他日期的选中状态
                 grid.querySelectorAll('.selected').forEach(el => el.classList.remove('selected'));
                 dayEl.classList.add('selected');
             };
-
+            
             grid.appendChild(dayEl);
         }
     }
@@ -211,73 +215,19 @@ export class CalendarView extends ItemView {
 
     isToday(year: number, month: number, date: number): boolean {
         const today = new Date();
-        return today.getFullYear() === year &&
-            today.getMonth() === month &&
-            today.getDate() === date;
+        return today.getFullYear() === year && 
+               today.getMonth() === month && 
+               today.getDate() === date;
     }
 
     async updateDailyContent(date: Date) {
         const contentEl = this.contentEl.querySelector('.daily-content');
-        if (!contentEl) {
-            console.error('找不到内容元素');
-            return;
-        }
+        if (!contentEl) return;
 
         try {
-            // 清空内容
             contentEl.empty();
-
-            // 添加输入组件
-            const inputContainer = contentEl.createDiv({ cls: 'daily-input-container' });
-            const textarea = inputContainer.createEl('textarea', {
-                attr: { placeholder: '快速记录...' },
-                cls: 'daily-input'
-            });
-            textarea.style.cssText = `
-  width: 100%;
-  height: 80px;
-  margin-bottom: 8px;
-  background: var(--background-secondary);
-  color: var(--text-normal);
-  border: 1px solid var(--background-modifier-border);
-`;
-
-            const submitBtn = inputContainer.createEl('button', {
-                text: '添加记录',
-                cls: 'daily-submit'
-            });
-            submitBtn.style.cssText = `
-                background: var(--interactive-accent);
-                color: var(--text-on-accent);
-                border: none;
-                padding: 6px 12px;
-                border-radius: 4px;
-                cursor: pointer;
-            `;
-
-            // 添加提交事件
-            submitBtn.onclick = async () => {
-                const timestamp = moment().format('HH:mm');
-                const processedContent = textarea.value.split('\n').map(line => `\t${line}`).join('\n');
-                const entryContent = `- ${timestamp}\n${processedContent}`;
-
-                const dailyNotePath = `${this.DAILY_PATH}/${moment(date).format('YYYY')}/${moment(date).format('MM')}/${moment(date).format('YYYY-MM-DD')}.md`;
-
-                let file = this.app.vault.getAbstractFileByPath(dailyNotePath);
-                if (!file) {
-                    file = await this.app.vault.create(dailyNotePath, '### 每日记录\n');
-                }
-
-                if (file instanceof TFile) {
-                    const currentContent = await this.app.vault.read(file);
-                    await this.app.vault.modify(file, currentContent + '\n' + entryContent);
-                    textarea.value = '';
-                    new Notice('记录添加成功');
-                }
-            };
-
+            
             // 添加日期标题和新建按钮
-            // 添加原有头部内容
             const headerEl = contentEl.createDiv({ cls: 'daily-header' });
             headerEl.createEl('h2', {
                 text: date.toLocaleDateString('zh-CN', {
@@ -288,12 +238,101 @@ export class CalendarView extends ItemView {
                 })
             });
 
-
-
             // 创建内容容器
             const contentContainer = contentEl.createDiv({ cls: 'content-container' });
 
-            // 分别创建三个部分的容器
+            // 创建输入区域
+            const inputSection = contentContainer.createDiv({ cls: 'memo-input-section' });
+            
+            // 创建输入框容器
+            const inputContainer = inputSection.createDiv({ cls: 'memo-input-container' });
+            
+            // 创建内容输入框
+            const textArea = new TextAreaComponent(inputContainer);
+            textArea
+                .setPlaceholder('记录此刻...')
+                .setValue('')
+                .then(() => {
+                    const textAreaEl = textArea.inputEl;
+                    textAreaEl.addClass('memo-content-input');
+                    textAreaEl.rows = 4;
+                });
+
+            // 创建预览区域
+            const previewEl = inputContainer.createDiv({ cls: 'memo-preview' });
+
+            // 监听输入变化并更新预览
+            textArea.onChange(async (value) => {
+                if (!value.trim()) {
+                    previewEl.empty();
+                    return;
+                }
+                
+                // 清空预览区域并重新渲染
+                previewEl.empty();
+                await MarkdownRenderer.renderMarkdown(
+                    value,
+                    previewEl,
+                    '',
+                    this
+                );
+            });
+                  
+            // 创建提交按钮
+            const submitButton = inputContainer.createEl('button', {
+                cls: 'memo-submit-button',
+                text: '添加'
+            });
+
+            // 添加提交事件
+            submitButton.addEventListener('click', async () => {
+                const content = textArea.getValue();
+                
+                if (!content.trim()) {
+                    new Notice('请输入内容');
+                    return;
+                }
+
+                try {
+                    const now = new Date();
+                    const time = now.toLocaleTimeString('zh-CN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+
+                    const dateString = this.getDateString(date);
+                    const filePath = `${IMAGE_BASE_URL_DAILY}${dateString.slice(0, 4)}/${dateString.slice(5, 7)}/${dateString}.md`;
+                    let file = this.app.vault.getAbstractFileByPath(filePath) as TFile;
+
+                    // 如果文件不存在，创建新文件
+                    if (!file) {
+                        file = await this.app.vault.create(filePath, '');
+                    }
+
+                    // 读取现有内容
+                    const existingContent = await this.app.vault.read(file);
+                    
+                    // 构建新的内容
+                    const newMemo = `\n- ${time}\n ${content.split('\n').map(line => `\t${line}`).join('\n')}`;
+                    
+                    // 添加到文件末尾
+                    await this.app.vault.modify(file, existingContent + newMemo);
+
+                    // 清空输入框
+                    textArea.setValue('');
+                    
+                    // 刷新显示
+                    this.updateDailyContent(date);
+                    
+                    new Notice('添加成功');
+                } catch (error) {
+                    console.error('添加内容失败:', error);
+                    new Notice('添加失败');
+                }
+            });
+
+            // 创建其他部分的容器
             const timelineSection = contentContainer.createDiv({ cls: 'timeline-section' });
             const todoSection = contentContainer.createDiv({ cls: 'todo-section' });
             const memoSection = contentContainer.createDiv({ cls: 'memo-section' });
@@ -303,31 +342,24 @@ export class CalendarView extends ItemView {
             todoSection.createEl('h3', { text: '🎯 每日任务' });
             memoSection.createEl('h3', { text: '📝 Memo' });
 
-            // 获取日期字符串，格式为YYYY-MM-DD
             const dateString = this.getDateString(date);
-            // 获取中文格式的日期字符串
             const formattedDate = this.formatChineseDate(date);
-
-            // 定义支持的日期格式，用于匹配文件路径
+            
             const dateFormats = [dateString, formattedDate];
-            // 获取与当前日期匹配的Markdown文件
             const files = this.app.vault.getMarkdownFiles()
                 .filter(file => dateFormats.some(format => file.path.includes(format)));
 
-            // 设置新建按钮事件 - 移到这里，确保在所有情况下都可用
-
-
             // 如果没有文件，显示空状态
             if (files.length === 0) {
-                timelineSection.createDiv({
+                timelineSection.createDiv({ 
                     cls: 'empty-state',
                     text: '暂无时间轨迹'
                 });
-                todoSection.createDiv({
+                todoSection.createDiv({ 
                     cls: 'empty-state',
                     text: '暂无待办事项'
                 });
-                memoSection.createDiv({
+                memoSection.createDiv({ 
                     cls: 'empty-state',
                     text: '暂无备忘录'
                 });
@@ -339,7 +371,7 @@ export class CalendarView extends ItemView {
                 try {
                     const content = await this.app.vault.cachedRead(file);
                     const sections = content.split(/^## /m);
-
+                    
                     for (const section of sections) {
                         const sectionContent = section.trim();
                         // 移除原始标题，只保留内容
@@ -347,7 +379,7 @@ export class CalendarView extends ItemView {
                             .replace(/^[⏳🎯📝].*?\n/, '') // 移除emoji开头的标题行
                             .trim();
                         if (sectionContent.startsWith('⏳ 时间轨迹')) {
-
+                            
                             await MarkdownRenderer.renderMarkdown(
                                 contentWithoutTitle,
                                 timelineSection.createDiv(),
@@ -393,7 +425,6 @@ export class CalendarView extends ItemView {
                         else if (sectionContent.startsWith('memo') || sectionContent.startsWith('📝 memo')) {
                             // 处理图片路径
                             const processedContent = await this.processImagePaths(contentWithoutTitle, file);
-
                             await MarkdownRenderer.renderMarkdown(
                                 processedContent,
                                 memoSection.createDiv(),
@@ -410,55 +441,6 @@ export class CalendarView extends ItemView {
             console.error('更新日期内容时出错:', error);
             // 确保即使出错也能显示基本结构
             contentEl.empty();
-
-            // 添加输入组件
-            const inputContainer = contentEl.createDiv({ cls: 'daily-input-container' });
-            const textarea = inputContainer.createEl('textarea', {
-                attr: { placeholder: '快速记录...' },
-                cls: 'daily-input'
-            });
-            textarea.style.cssText = `
-  width: 100%;
-  height: 80px;
-  margin-bottom: 8px;
-  background: var(--background-secondary);
-  color: var(--text-normal);
-  border: 1px solid var(--background-modifier-border);
-`;
-
-            const submitBtn = inputContainer.createEl('button', {
-                text: '添加记录',
-                cls: 'daily-submit'
-            });
-            submitBtn.style.cssText = `
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border: none;
-  padding: 6px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-`;
-
-            // 添加提交事件
-            submitBtn.onclick = async () => {
-                const timestamp = moment().format('HH:mm');
-                const processedContent = textarea.value.split('\n').map(line => `\t${line}`).join('\n');
-                const entryContent = `- ${timestamp}\n${processedContent}`;
-
-                const dailyNotePath = `${this.DAILY_PATH}/${moment(date).format('YYYY')}/${moment(date).format('MM')}/${moment(date).format('YYYY-MM-DD')}.md`;
-
-                let file = this.app.vault.getAbstractFileByPath(dailyNotePath);
-                if (!file) {
-                    file = await this.app.vault.create(dailyNotePath, '### 每日记录\n');
-                }
-
-                if (file instanceof TFile) {
-                    const currentContent = await this.app.vault.read(file);
-                    await this.app.vault.modify(file, currentContent + '\n' + entryContent);
-                    textarea.value = '';
-                    new Notice('记录添加成功');
-                }
-            };
             contentEl.createEl('div', {
                 cls: 'error-state',
                 text: '加载内容时出错，请重试'
@@ -469,7 +451,7 @@ export class CalendarView extends ItemView {
     // 添加处理图片路径的方法
     private async processImagePaths(content: string, file: TFile): Promise<string> {
         const imageRegex = /!\[\[([^\]]+?\.(?:png|jpg|jpeg|gif|webp|bmp))(\\?[|\]]?.*?)\]\]/g;
-
+        
         return content.replace(imageRegex, (match, imagePath) => {
             try {
                 // 1. 获取图片文件
@@ -481,15 +463,15 @@ export class CalendarView extends ItemView {
                 if (imageFile instanceof TFile) {
                     // 2. 获取图片的资源路径
                     const resourcePath = this.app.vault.getResourcePath(imageFile);
-
+                    
                     // 3. 返回标准的 Markdown 图片语法
                     return `![${imagePath}](${resourcePath})`;
                 }
-
+                
                 // 如果找不到图片，保持原样
                 return match;
             } catch (error) {
-                console.error('处理图片路径时出错:', error, { imagePath, file });
+                console.error('处理图片路径时出错:', error, {imagePath, file});
                 return match;
             }
         });
@@ -503,68 +485,68 @@ export class CalendarView extends ItemView {
     ): Promise<string> {
         // 匹配Obsidian图片语法（包含参数和特殊字符）
         const IMAGE_REGEX = /!\[\[([^\]]+?\.(?:png|jpg|jpeg|gif|webp|bmp))(\\?[|\]]?.*?)\]\]/g;
-
+    
         // 获取用户配置的附件目录（默认_Attachment）
         const attachmentFolder = vault.config.attachmentFolderPath || '_Attachment';
-
+    
         // 创建路径缓存（提升重复路径处理性能）
         const pathCache = new Map<string, string>();
-
+    
         // 替换处理逻辑
         const processedContent = content.replace(IMAGE_REGEX, async (match, pathPart, params) => {
-            try {
-                // 标准化路径（处理Windows反斜杠和URI编码）
-                const normalizedPath = pathPart
-                    .replace(/\\/g, '/')
-                    .replace(/#.*$/, '') // 移除锚点（[[5]](#__5)）
-                    .trim();
-
-                // 检查缓存
-                if (pathCache.has(normalizedPath)) {
-                    return `![[${pathCache.get(normalizedPath)}${params}]]`;
-                }
-
-                // 动态构建完整路径（适配用户配置）
-                let fullPath: string;
-                if (normalizedPath.startsWith('/')) {
-                    // 绝对路径处理（[[4]](#__4)）
-                    fullPath = normalizedPath.slice(1);
-                } else {
-                    // 相对路径处理（[[7]](#__7)）
-                    const currentDir = path.dirname(currentFile.path);
-                    fullPath = path.join(currentDir, normalizedPath);
-                }
-
-                // 验证文件存在性（[[2]](#__2)）
-                const targetFile = vault.getAbstractFileByPath(fullPath);
-                if (!(targetFile instanceof TFile)) {
-                    console.warn(`图片不存在: ${fullPath}`);
-                    return match; // 保留原始格式
-                }
-
-                // 创建附件目录结构（[[4]](#__4)）
-                const destFolder = path.join(attachmentFolder, path.dirname(normalizedPath));
-                await vault.createFolder(destFolder).catch(() => { }); // 忽略已存在错误
-
-                // 构建最终路径（带URI编码）
-                const encodedPath = encodeURI(path.join(attachmentFolder, normalizedPath))
-                    .replace(/'/g, '%27')
-                    .replace(/\(/g, '%28')
-                    .replace(/\)/g, '%29');
-
-                // 更新缓存
-                pathCache.set(normalizedPath, encodedPath);
-
-                return `![[${encodedPath}${params}]]`;
-            } catch (error) {
-                console.error(`图片处理失败: ${error}`);
-                return match; // 失败时保留原始内容
+        try {
+            // 标准化路径（处理Windows反斜杠和URI编码）
+            const normalizedPath = pathPart
+            .replace(/\\/g, '/')
+            .replace(/#.*$/, '') // 移除锚点（[[5]](#__5)）
+            .trim();
+    
+            // 检查缓存
+            if (pathCache.has(normalizedPath)) {
+            return `![[${pathCache.get(normalizedPath)}${params}]]`;
             }
+    
+            // 动态构建完整路径（适配用户配置）
+            let fullPath: string;
+            if (normalizedPath.startsWith('/')) {
+            // 绝对路径处理（[[4]](#__4)）
+            fullPath = normalizedPath.slice(1);
+            } else {
+            // 相对路径处理（[[7]](#__7)）
+            const currentDir = path.dirname(currentFile.path);
+            fullPath = path.join(currentDir, normalizedPath);
+            }
+    
+            // 验证文件存在性（[[2]](#__2)）
+            const targetFile = vault.getAbstractFileByPath(fullPath);
+            if (!(targetFile instanceof TFile)) {
+            console.warn(`图片不存在: ${fullPath}`);
+            return match; // 保留原始格式
+            }
+    
+            // 创建附件目录结构（[[4]](#__4)）
+            const destFolder = path.join(attachmentFolder, path.dirname(normalizedPath));
+            await vault.createFolder(destFolder).catch(() => {}); // 忽略已存在错误
+    
+            // 构建最终路径（带URI编码）
+            const encodedPath = encodeURI(path.join(attachmentFolder, normalizedPath))
+            .replace(/'/g, '%27')
+            .replace(/\(/g, '%28')
+            .replace(/\)/g, '%29');
+    
+            // 更新缓存
+            pathCache.set(normalizedPath, encodedPath);
+    
+            return `![[${encodedPath}${params}]]`;
+        } catch (error) {
+            console.error(`图片处理失败: ${error}`);
+            return match; // 失败时保留原始内容
+        }
         });
-
+    
         return processedContent;
     }
-
+  
     private parseContent(content: string): {
         timeline: string | null;
         todos: TodoItem[];
@@ -625,7 +607,7 @@ export class CalendarView extends ItemView {
             else if (section.trim().startsWith('📝 memo')) {
                 console.log("发现 Memo 部分");
                 const lines = section.split('\n');
-
+                
                 lines.forEach(line => {
                     // 匹配 "- HH:MM" 格式
                     const memoMatch = line.match(/^-\s+(\d{2}:\d{2})\s+(.*)/);
@@ -634,7 +616,7 @@ export class CalendarView extends ItemView {
                         // 提取标签
                         const tags = content.match(/#[\w/]+/g) || [];
                         const cleanContent = content.replace(/#[\w/]+/g, '').trim();
-
+                        
                         memos.push({
                             time,
                             content: cleanContent,
@@ -756,13 +738,13 @@ export class CalendarView extends ItemView {
                     // 修改这里：使用 checkbox.checked 而不是其反值
                     const newState = checkbox.checked;
                     console.log('设置新状态为:', newState);
-
+                    
                     const success = await this.updateTaskState(file, taskText, newState);
-
+                    
                     if (success) {
                         // 不需要再次切换 checkbox，因为浏览器已经切换了
                         taskItem.classList.toggle('is-checked', newState);
-
+                        
                         // 立即刷新视图
                         await this.updateDailyContent(this.currentDate);
                     } else {
@@ -793,7 +775,7 @@ export class CalendarView extends ItemView {
             try {
                 const content = await this.app.vault.cachedRead(file);
                 const tags = content.match(/#[\w/]+/g) || [];
-
+                
                 tags.forEach(tag => {
                     if (!this.tagCache.has(tag)) {
                         this.tagCache.set(tag, {
@@ -833,7 +815,7 @@ export class CalendarView extends ItemView {
             for (let i = 0; i < parts.length; i++) {
                 const part = parts[i];
                 const currentPath = '#' + parts.slice(0, i + 1).join('/');
-
+                
                 if (!current.children.has(part)) {
                     current.children.set(part, {
                         name: part,
@@ -843,7 +825,7 @@ export class CalendarView extends ItemView {
                         children: new Map()
                     });
                 }
-
+                
                 const node = current.children.get(part)!;
                 node.count += info.count;
                 info.files.forEach(file => node.files.add(file));
@@ -859,7 +841,7 @@ export class CalendarView extends ItemView {
             const tagEl = container.createEl('div', {
                 cls: `tag-item level-${level}`,
             });
-
+            
             if (node.children.size > 0) {
                 tagEl.createEl('span', {
                     cls: 'tag-toggle'
@@ -895,7 +877,7 @@ export class CalendarView extends ItemView {
             const childContainer = container.createEl('div', {
                 cls: `tag-children ${level > 0 ? 'hidden' : ''}`
             });
-
+            
             const sortedChildren = Array.from(node.children.values())
                 .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
 
@@ -949,9 +931,9 @@ export class CalendarView extends ItemView {
     // 激活日历视图
     async activateView() {
         const { workspace } = this.app;
-
+        
         let leaf = workspace.getLeavesOfType(VIEW_TYPE_CALENDAR)[0];
-
+        
         if (!leaf) {
             leaf = workspace.getLeaf(false);
             await leaf.setViewState({
@@ -959,7 +941,7 @@ export class CalendarView extends ItemView {
                 active: true,
             });
         }
-
+        
         workspace.revealLeaf(leaf);
     }
 }
@@ -983,11 +965,11 @@ class TaggedFilesModal extends Modal {
 
         // 创建标题栏
         const headerEl = contentEl.createDiv({ cls: 'tagged-files-modal-header' });
-
+        
         // 标题
-        headerEl.createEl('h2', {
+        headerEl.createEl('h2', { 
             text: `#${this.tagInfo.tag}`,
-            cls: 'tagged-files-header'
+            cls: 'tagged-files-header' 
         });
 
         // 关闭按钮
@@ -1001,9 +983,9 @@ class TaggedFilesModal extends Modal {
 
         try {
             // 创建加载指示器
-            const loadingIndicator = contentEl.createDiv({
+            const loadingIndicator = contentEl.createDiv({ 
                 cls: 'loading-indicator',
-                text: '加载中...'
+                text: '加载中...' 
             });
 
             await this.loadMoreItems();
@@ -1011,7 +993,7 @@ class TaggedFilesModal extends Modal {
 
             // 创建观察目标
             const observerTarget = contentEl.createDiv({ cls: 'observer-target' });
-
+            
             // 设置无限滚动
             this.observer = new IntersectionObserver(async (entries) => {
                 const target = entries[0];
@@ -1021,13 +1003,13 @@ class TaggedFilesModal extends Modal {
                     loadingIndicator.addClass('hidden');
                 }
             });
-
+            
             this.observer.observe(observerTarget);
         } catch (error) {
             console.error('初始化模态窗口失败:', error);
-            const errorEl = contentEl.createDiv({
+            const errorEl = contentEl.createDiv({ 
                 cls: 'error-state',
-                text: '加载内容失败，请重试'
+                text: '加载内容失败，请重试' 
             });
         }
     }
@@ -1077,9 +1059,9 @@ class TaggedFilesModal extends Modal {
 
         // 卡片头部（保持原样）
         const header = card.createDiv({ cls: 'note-card-header' });
-        header.createDiv({
+        header.createDiv({ 
             cls: 'note-card-title',
-            text: file.basename
+            text: file.basename 
         });
 
         // 新增标签内容容器
@@ -1102,17 +1084,20 @@ class TaggedFilesModal extends Modal {
     private splitByTimeBlock(mdContent) {
         const timeBlockRegex = /^- \d{2}:\d{2}/gm;
         return mdContent.split(timeBlockRegex)
-            .slice(1) // 去除第一个空元素
-            .map((block, index) => {
-                return block
-                // const timeMatch = mdContent.match(timeBlockRegex)[index];
-                // return {
-                //     time: timeMatch.trim().replace(/^- /, ''),
-                //     content: block.trim()
-                // };
-            });
+        .slice(1) // 去除第一个空元素
+        .map((block, index) => {
+            return block
+            // const timeMatch = mdContent.match(timeBlockRegex)[index];
+            // return {
+            //     time: timeMatch.trim().replace(/^- /, ''),
+            //     content: block.trim()
+            // };
+        });
     }
     async private renderTagSpecificContent(content: string, container: HTMLElement, file: TFile) {
+    
+        const MERMAIRD_REGEX = /```mermaid([\s\S]*?)```/g;
+        const LOCAL_IMAGE_REGEX = /!\[\[([^\]]+\.(?:png|jpg|gif|webp))(?:\\?\||\])/g;
 
         const blockEl = container.createDiv({ cls: 'tag-content-block' });
         blockEl.createEl('div', {});
@@ -1124,14 +1109,16 @@ class TaggedFilesModal extends Modal {
             const contentWithoutTitle = sectionContent
                 .replace(/^[⏳🎯📝].*?\n/, '') // 移除emoji开头的标题行
                 .trim();
-            if (sectionContent.startsWith('memo') || sectionContent.startsWith('📝 memo')) {
+            if(sectionContent.startsWith('memo') || sectionContent.startsWith('📝 memo')) {
                 let block = this.splitByTimeBlock(sectionContent)
                 let renderBlock = block.filter(item => item.includes(this.tagInfo.tag))
                 // console.log(renderBlock, 66669999)
 
                 renderBlock.forEach(async content => {
                     console.log(666666, content.replace(/(\n *)(```)/g, '$2').trim())
-                    // 处理图片路径
+                    // 替换为临时占位符
+                    // content = content.replace(MERMAIRD_REGEX, (match) => `<!--MERMAIRD_BLOCK-->${match}<!--/MERMAIRD_BLOCK-->`);
+                            // 处理图片路径
                     const processedContent = await this.processImagePaths(content.replace(/(\n *)(```)/g, '$2').replace(/(\t *)(```)/g, '$2').replace(/(\n\t *)(```)/g, '$2').trim(), file);
                     await MarkdownRenderer.renderMarkdown(
                         processedContent,
@@ -1140,7 +1127,7 @@ class TaggedFilesModal extends Modal {
                         this
                     );
                 })
-
+                
             }
         }
     }
@@ -1148,7 +1135,7 @@ class TaggedFilesModal extends Modal {
     // 添加处理图片路径的方法
     private async processImagePaths(content: string, file: TFile): Promise<string> {
         const imageRegex = /!\[\[([^\]]+?\.(?:png|jpg|jpeg|gif|webp|bmp))(\\?[|\]]?.*?)\]\]/g;
-
+        
         return content.replace(imageRegex, (match, imagePath) => {
             try {
                 // 1. 获取图片文件
@@ -1160,15 +1147,15 @@ class TaggedFilesModal extends Modal {
                 if (imageFile instanceof TFile) {
                     // 2. 获取图片的资源路径
                     const resourcePath = this.app.vault.getResourcePath(imageFile);
-
+                    
                     // 3. 返回标准的 Markdown 图片语法
                     return `![${imagePath}](${resourcePath})`;
                 }
-
+                
                 // 如果找不到图片，保持原样
                 return match;
             } catch (error) {
-                console.error('处理图片路径时出错:', error, { imagePath, file });
+                console.error('处理图片路径时出错:', error, {imagePath, file});
                 return match;
             }
         });
@@ -1176,7 +1163,7 @@ class TaggedFilesModal extends Modal {
     // 增强的上下文操作
     private addContextActions(blockEl: HTMLElement, file: TFile, content: string) {
         const actionBar = blockEl.createDiv({ cls: 'tag-content-actions' });
-
+        
         // 复制完整块
         actionBar.createEl('button', {
             text: '📋 复制块',
@@ -1201,7 +1188,7 @@ class TaggedFilesModal extends Modal {
     private async revealInEditor(file: TFile, position: number) {
         const leaf = this.app.workspace.getLeaf(false);
         await leaf.openFile(file);
-
+        
         if (leaf.view instanceof MarkdownView) {
             const editor = leaf.view.editor;
             editor.setCursor(editor.offsetToPos(position));
@@ -1213,12 +1200,12 @@ class TaggedFilesModal extends Modal {
         // 提取前 200 个字符作为预览，确保不会截断 Markdown 语法
         const previewLength = 200;
         let preview = content.slice(0, previewLength);
-
+        
         // 如果内容被截断，添加省略号
         if (content.length > previewLength) {
             preview += '...';
         }
-
+        
         return preview;
     }
 
@@ -1227,6 +1214,4 @@ class TaggedFilesModal extends Modal {
         const { contentEl } = this;
         contentEl.empty();
     }
-}
-
-
+} 
