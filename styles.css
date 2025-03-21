@@ -131,6 +131,7 @@ If your plugin does not need CSS, delete this file.
     grid-template-columns: repeat(7, 1fr);
 
     gap: 4px;
+    margin-bottom: 10px;
 
 }
 
@@ -140,11 +141,13 @@ If your plugin does not need CSS, delete this file.
 
     display: flex;
 
+    flex-direction: column;
+
     justify-content: center;
 
     align-items: center;
 
-    height: 32px;
+    height: 40px;
 
     border-radius: 4px;
 
@@ -153,6 +156,8 @@ If your plugin does not need CSS, delete this file.
     transition: all 0.2s ease;
 
     font-size: 0.9em;
+
+    padding: 4px;
 
 }
 
@@ -1340,31 +1345,24 @@ If your plugin does not need CSS, delete this file.
     border-radius: 8px;
 }
 
-.memo-input-container {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
+.memo-editor-container {
+    margin-bottom: 12px;
 }
 
-.memo-time-input {
-    width: 100px;
-    padding: 4px 8px;
+/* 编辑器样式 */
+.memo-editor-container .cm-editor {
     border: 1px solid var(--background-modifier-border);
     border-radius: 4px;
-    background: var(--background-primary);
-    color: var(--text-normal);
-}
-
-.memo-content-input {
-    width: 100%;
-    padding: 8px;
-    border: 1px solid var(--background-modifier-border);
-    border-radius: 4px;
-    background: var(--background-primary);
-    color: var(--text-normal);
+    min-height: 100px;
     font-family: var(--font-monospace);
-    resize: vertical;
-    min-height: 80px;
+}
+
+.memo-editor-container .cm-editor.cm-focused {
+    border-color: var(--interactive-accent);
+}
+
+.memo-editor-container .cm-line {
+    padding: 0 8px;
 }
 
 .memo-submit-button {
@@ -1428,7 +1426,7 @@ If your plugin does not need CSS, delete this file.
     border-top: 1px solid var(--background-modifier-border);
     display: flex;
     gap: 8px;
-    opacity: 0;
+    /* opacity: 0; */
     transition: opacity 0.2s;
 }
 
@@ -1475,4 +1473,165 @@ If your plugin does not need CSS, delete this file.
 
 .memo-preview p {
     margin: 0.5em 0;
+}
+
+/* 分屏容器样式 */
+.memo-split-container {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.memo-input-container {
+    flex: 1;
+    min-width: 0; /* 防止flex子项溢出 */
+}
+
+.memo-preview-container {
+    flex: 1;
+    min-width: 0;
+}
+
+.memo-content-input {
+    width: 100%;
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-primary);
+    color: var(--text-normal);
+    font-family: var(--font-monospace);
+    resize: vertical;
+    min-height: 120px;
+    line-height: 1.5;
+}
+
+.memo-preview {
+    padding: 12px;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    background: var(--background-secondary);
+    min-height: 120px;
+    max-height: 400px;
+    overflow-y: auto;
+    line-height: 1.5;
+}
+
+/* 预览内容样式 */
+.memo-preview > * {
+    margin: 0.5em 0;
+}
+
+.memo-preview > *:first-child {
+    margin-top: 0;
+}
+
+.memo-preview > *:last-child {
+    margin-bottom: 0;
+}
+
+.memo-preview img {
+    max-width: 100%;
+    height: auto;
+}
+
+.memo-preview code {
+    background: var(--background-primary);
+    padding: 0.2em 0.4em;
+    border-radius: 3px;
+}
+
+.memo-preview pre {
+    background: var(--background-primary);
+    padding: 1em;
+    border-radius: 4px;
+    overflow-x: auto;
+}
+
+/* 自动补全样式 */
+.suggestion-container {
+    background: var(--background-primary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.suggestion-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    cursor: pointer;
+    color: var(--text-normal);
+}
+
+.suggestion-item:hover {
+    background: var(--background-modifier-hover);
+}
+
+.suggestion-item.is-selected {
+    background: var(--background-modifier-hover);
+}
+
+.suggestion-icon {
+    color: var(--text-muted);
+    margin-right: 8px;
+    font-weight: bold;
+}
+
+.suggestion-content {
+    flex: 1;
+}
+
+/* 心情图标样式 */
+.calendar-day-mood {
+    font-size: 0.8em;
+    margin-top: 2px;
+    height: 16px;
+    line-height: 1;
+    opacity: 0.8;
+}
+
+/* 其他月份的心情图标样式 */
+.calendar-day.other-month .calendar-day-mood {
+    opacity: 0.5;
+}
+
+/* 今天的心情图标样式 */
+.calendar-day.today .calendar-day-mood {
+    opacity: 1;
+}
+
+/* 选中日期的心情图标样式 */
+.calendar-day.selected .calendar-day-mood {
+    opacity: 1;
+}
+
+
+.tag-content-block img{
+    width: 80%;
+}
+.tag-content-block-content{
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid var(--background-modifier-border);
+    margin-bottom: 10px;
+}
+.tag-content-block-content .tag-content-actions{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+.tag-content-block-content .tag-content-actions button{
+    background: var(--interactive-normal);
+    color: var(--text-normal);
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.tag-content-block-content .tag-content-actions button:hover {
+    background: var(--interactive-hover);
 }

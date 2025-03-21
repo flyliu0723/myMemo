@@ -25,10 +25,10 @@ export default class CalendarPlugin extends Plugin {
 
 		// 添加图标按钮到左侧
 		this.addRibbonIcon(
-			'calendar-with-checkmark',
-			'日历视图',
-			async () => {
-				await this.activateView();
+			'calendar',
+			'打开日历视图',
+			() => {
+				this.activateView();
 			}
 		);
 
@@ -92,18 +92,17 @@ export default class CalendarPlugin extends Plugin {
 	}
 
 	async activateView() {
-		// 如果视图已存在，激活它
-		const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_CALENDAR);
-		if (leaves.length > 0) {
-			this.app.workspace.revealLeaf(leaves[0]);
-			return;
+		const { workspace } = this.app;
+		
+		let leaf = workspace.getLeavesOfType(VIEW_TYPE_CALENDAR)[0];
+		if (!leaf) {
+			leaf = workspace.getLeaf(false);
+			await leaf.setViewState({
+				type: VIEW_TYPE_CALENDAR,
+				active: true,
+			});
 		}
-
-		// 创建新的视图
-		await this.app.workspace.getLeaf(false).setViewState({
-			type: VIEW_TYPE_CALENDAR,
-			active: true,
-		});
+		workspace.revealLeaf(leaf);
 	}
 
 	async loadSettings() {
